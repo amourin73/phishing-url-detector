@@ -109,6 +109,44 @@ def health():
         'status': 'healthy' if classifier else 'unhealthy',
         'model_loaded': classifier is not None
     })
+# Add this endpoint to your existing web_app.py
+
+@app.route('/batch-check-urls', methods=['POST'])
+def batch_check_urls():
+    """Check multiple URLs for phishing"""
+    if classifier is None:
+        return jsonify({'error': 'Model not loaded. Please train the model first.', 'success': False}), 500
+
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No JSON data provided'}), 400
+
+        urls = data.get('urls', [])
+        if not urls:
+            return jsonify({'error': 'URLs array is required'}), 400
+
+        results = []
+        for url in urls:
+            url = url.strip()
+            if not url.startswith(('http://', 'https://')):
+                url = 'http://' + url
+
+            result = classifier.predict(url)
+            result['url'] = url
+            result['confidence'] = float(result.get('confidence', 0.5))
+            result['probability'] = float(result.get('probability', 0.5))
+            results.append(result)
+
+        return jsonify({
+            'results': results,
+            'total_checked': len(results),
+            'phishing_count': sum(1 for r in results if r['is_phishing']),
+            'success': True
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e), 'success': False}), 500
 
 
 if __name__ == '__main__':

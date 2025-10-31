@@ -132,6 +132,34 @@
       border-radius: 8px;
       text-align: center;
     }
+
+    /* Scan Page Button Styles */
+    #scanPageBtn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border: 1px solid rgba(255,255,255,0.3);
+    }
+
+    #scanPageBtn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    /* Message Animation */
+    .phishing-popup-message {
+      animation: slideDown 0.3s ease-out;
+    }
+
+    @keyframes slideDown {
+      from {
+        transform: translateX(-50%) translateY(-20px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+      }
+    }
   </style>
 </head>
 <body>
@@ -154,6 +182,7 @@
     <div id="error" class="error hidden"></div>
 
     <button id="refreshBtn">🔄 Reanalyze</button>
+    <button id="scanPageBtn">🔍 Scan Page for URLs</button>
     <button id="settingsBtn">⚙️ Settings</button>
   </div>
 

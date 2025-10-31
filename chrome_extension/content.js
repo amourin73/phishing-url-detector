@@ -1,78 +1,148 @@
-// Content script for additional page analysis
-class PageAnalyzer {
-  constructor() {
-    this.analyzePage();
-  }
-
-  analyzePage() {
-    // Analyze page content for phishing indicators
-    const indicators = this.detectPhishingIndicators();
-
-    if (indicators.length > 0) {
-      this.sendAnalysisToBackground(indicators);
-    }
-  }
-
-  detectPhishingIndicators() {
-    const indicators = [];
-
-    // Check for suspicious form fields
-    const passwordFields = document.querySelectorAll('input[type="password"]');
-    const emailFields = document.querySelectorAll('input[type="email"]');
-    const creditCardFields = document.querySelectorAll('input[autocomplete*="cc"]');
-
-    if (passwordFields.length > 0) {
-      indicators.push('Contains password fields');
+// Content script for page analysis and URL scanning
+class ContentScriptManager {
+    constructor() {
+        this.isInitialized = false;
+        this.init();
     }
 
-    if (emailFields.length > 0) {
-      indicators.push('Contains email input fields');
+    async init() {
+        try {
+            console.log('🔄 Phishing Detector Content Script Loading...');
+
+            // Wait for page to be ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => this.initializeScanner());
+            } else {
+                await this.initializeScanner();
+            }
+
+            this.setupMessageListener();
+            this.isInitialized = true;
+
+            console.log('✅ Phishing Detector Content Script Ready');
+        } catch (error) {
+            console.error('❌ Content Script Error:', error);
+        }
     }
 
-    if (creditCardFields.length > 0) {
-      indicators.push('Contains credit card input fields');
+    async initializeScanner() {
+        try {
+            // Inject the page scanner
+            await this.injectPageScanner();
+
+            // Wait a bit for the page to fully load
+            setTimeout(() => {
+                if (window.PageURLScanner) {
+                    this.pageScanner = new window.PageURLScanner();
+                    console.log('✅ Page Scanner Initialized');
+
+                    // Auto-scan after delay
+                    setTimeout(() => {
+                        this.autoScanPage();
+                    }, 2000);
+                }
+            }, 1000);
+
+        } catch (error) {
+            console.error('Error initializing scanner:', error);
+        }
     }
 
-    // Check for suspicious text content
-    const pageText = document.body.innerText.toLowerCase();
-    const suspiciousKeywords = [
-      'verify your account', 'security alert', 'suspicious activity',
-      'update your information', 'password reset', 'account verification',
-      'confirm your identity', 'login to continue'
-    ];
+    injectPageScanner() {
+        return new Promise((resolve, reject) => {
+            try {
+                // Remove existing scanner if any
+                const existingScript = document.getElementById('phishing-scanner-script');
+                if (existingScript) {
+                    existingScript.remove();
+                }
 
-    suspiciousKeywords.forEach(keyword => {
-      if (pageText.includes(keyword)) {
-        indicators.push(`Contains suspicious text: "${keyword}"`);
-      }
-    });
+                const script = document.createElement('script');
+                script.id = 'phishing-scanner-script';
+                script.src = chrome.runtime.getURL('page_scanner.js');
+                script.onload = () => {
+                    console.log('✅ Page Scanner Script Injected');
+                    resolve();
+                };
+                script.onerror = (error) => {
+                    console.error('❌ Script Injection Failed:', error);
+                    reject(error);
+                };
 
-    // Check for brand impersonation in images
-    const images = document.querySelectorAll('img[src*="logo"], img[alt*="logo"]');
-    images.forEach(img => {
-      const src = img.src.toLowerCase();
-      const alt = img.alt.toLowerCase();
+                (document.head || document.documentElement).appendChild(script);
+            } catch (error) {
+                reject(error);
+            }
+        });
+    }
 
-      if (src.includes('google') || alt.includes('google') ||
-          src.includes('facebook') || alt.includes('facebook') ||
-          src.includes('microsoft') || alt.includes('microsoft') ||
-          src.includes('apple') || alt.includes('apple') ||
-          src.includes('paypal') || alt.includes('paypal')) {
-        indicators.push('Uses brand logos from well-known companies');
-      }
-    });
+    setupMessageListener() {
+        // Listen for messages from popup/background
+        chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+            console.log('📨 Content Script Received Message:', request);
 
-    return indicators;
-  }
+            switch (request.action) {
+                case 'scanPage':
+                    this.handleScanPage(request, sendResponse);
+                    return true; // Keep channel open for async response
 
-  sendAnalysisToBackground(indicators) {
-    chrome.runtime.sendMessage({
-      type: 'PAGE_ANALYSIS',
-      url: window.location.href,
-      indicators: indicators
-    });
-  }
+                case 'getStatus':
+                    sendResponse({
+                        status: 'ready',
+                        initialized: this.isInitialized,
+                        scannerReady: !!this.pageScanner
+                    });
+                    break;
+
+                case 'ping':
+                    sendResponse({ pong: true, tabId: sender.tab?.id });
+                    break;
+
+                default:
+                    sendResponse({ error: 'Unknown action' });
+            }
+        });
+    }
+
+    async handleScanPage(request, sendResponse) {
+        try {
+            console.log('🔄 Starting page scan from content script...');
+
+            if (!this.pageScanner) {
+                // Try to re-initialize scanner
+                await this.initializeScanner();
+
+                if (!this.pageScanner) {
+                    throw new Error('Page scanner not available');
+                }
+            }
+
+            await this.pageScanner.scanPage();
+            sendResponse({
+                success: true,
+                message: 'Page scan completed successfully'
+            });
+
+        } catch (error) {
+            console.error('Page scan error:', error);
+            sendResponse({
+                success: false,
+                error: error.message
+            });
+        }
+    }
+
+    async autoScanPage() {
+        try {
+            if (this.pageScanner && !this.pageScanner.scanning) {
+                console.log('🔍 Auto-scanning page for URLs...');
+                await this.pageScanner.scanPage();
+            }
+        } catch (error) {
+            console.log('Auto-scan skipped or failed:', error.message);
+        }
+    }
 }
 
-// Initialize page analyzer
-new PageAnalyzer();
+// Initialize content script
+new ContentScriptManager();
