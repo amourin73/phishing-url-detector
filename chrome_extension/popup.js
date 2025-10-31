@@ -1,80 +1,251 @@
-document.addEventListener('DOMContentLoaded', function() {
-    const urlText = document.getElementById('url-text');
-    const resultDiv = document.getElementById('result');
-    const statusIcon = document.getElementById('status-icon');
-    const statusText = document.getElementById('status-text');
-    const confidenceText = document.getElementById('confidence');
-    const checkBtn = document.getElementById('check-btn');
-    const errorDiv = document.getElementById('error');
+// Popup script for phishing detection extension
+class PhishingDetectorPopup {
+  constructor() {
+    this.currentTab = null;
+    this.apiBaseUrl = 'http://localhost:5000';
+    this.init();
+  }
 
-    // Get current tab URL
-    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-        const currentTab = tabs[0];
-        if (currentTab && currentTab.url) {
-            urlText.textContent = currentTab.url;
-            // Auto-check the URL
-            checkURL(currentTab.url);
-        } else {
-            urlText.textContent = 'Cannot access URL';
-        }
+  async init() {
+    await this.getCurrentTab();
+    this.bindEvents();
+    this.analyzeCurrentUrl();
+  }
+
+  async getCurrentTab() {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    this.currentTab = tab;
+    document.getElementById('currentUrl').textContent = this.formatUrl(tab.url);
+  }
+
+  formatUrl(url) {
+    try {
+      const urlObj = new URL(url);
+      return urlObj.hostname + urlObj.pathname;
+    } catch {
+      return url;
+    }
+  }
+
+  bindEvents() {
+    document.getElementById('refreshBtn').addEventListener('click', () => {
+      this.analyzeCurrentUrl();
     });
 
-    // Check URL function
-    async function checkURL(url) {
-        try {
-            showLoading();
-            errorDiv.classList.add('hidden');
+    document.getElementById('settingsBtn').addEventListener('click', () => {
+      chrome.runtime.openOptionsPage();
+    });
+  }
 
-            const response = await fetch(`http://localhost:5000/predict?url=${encodeURIComponent(url)}`);
-            const data = await response.json();
+  async analyzeCurrentUrl() {
+    this.showLoading();
 
-            if (data.error) {
-                throw new Error(data.error);
-            }
+    try {
+      const result = await this.checkUrl(this.currentTab.url);
+      this.displayResult(result);
+    } catch (error) {
+      this.showError('Failed to analyze URL: ' + error.message);
+    }
+  }
 
-            displayResult(data.result);
-        } catch (error) {
-            console.error('Error:', error);
-            errorDiv.textContent = 'Error: ' + error.message;
-            errorDiv.classList.remove('hidden');
-            resultDiv.classList.add('hidden');
-        }
+  async checkUrl(url) {
+    const response = await fetch(`${this.apiBaseUrl}/check`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ url: url })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Server returned ${response.status}`);
     }
 
-    function displayResult(result) {
-        resultDiv.className = 'result';
+    return await response.json();
+  }
 
-        if (result.safe) {
-            resultDiv.classList.add('safe');
-            statusIcon.innerHTML = '✅';
-            statusText.textContent = 'SAFE URL';
-            statusText.style.color = '#155724';
-        } else {
-            resultDiv.classList.add('phishing');
-            statusIcon.innerHTML = '🚨';
-            statusText.textContent = 'PHISHING DETECTED';
-            statusText.style.color = '#721c24';
-        }
+  showLoading() {
+    document.getElementById('status').className = 'status loading';
+    document.getElementById('status').textContent = '🔍 Analyzing URL...';
+    document.getElementById('confidence').textContent = '';
+    document.getElementById('explanation').classList.add('hidden');
+    document.getElementById('error').classList.add('hidden');
+  }
 
-        confidenceText.textContent = `Confidence: ${(result.confidence * 100).toFixed(1)}%`;
-        resultDiv.classList.remove('hidden');
+  displayResult(result) {
+    if (!result.success) {
+      this.showError(result.error || 'Analysis failed');
+      return;
     }
 
-    function showLoading() {
-        resultDiv.className = 'result';
-        resultDiv.classList.remove('hidden');
-        statusIcon.innerHTML = '⏳';
-        statusText.textContent = 'Analyzing...';
-        statusText.style.color = '#856404';
-        confidenceText.textContent = 'Please wait';
+    const isPhishing = result.is_phishing;
+    const confidence = result.confidence || result.probability || 0.5;
+
+    // Update status
+    const statusElement = document.getElementById('status');
+    if (isPhishing) {
+      statusElement.className = 'status phishing';
+      statusElement.textContent = '🚨 PHISHING DETECTED';
+    } else {
+      statusElement.className = 'status safe';
+      statusElement.textContent = '✅ SAFE';
     }
 
-    // Manual check button
-    checkBtn.addEventListener('click', function() {
-        chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-            if (tabs[0] && tabs[0].url) {
-                checkURL(tabs[0].url);
-            }
+    // Update confidence
+    document.getElementById('confidence').textContent =
+      `Confidence: ${(confidence * 100).toFixed(1)}%`;
+
+    // Generate explanation
+    this.generateExplanation(result, this.currentTab.url);
+
+    // Show explanation
+    document.getElementById('explanation').classList.remove('hidden');
+  }
+
+  generateExplanation(result, url) {
+    const featureList = document.getElementById('featureList');
+    featureList.innerHTML = '';
+
+    const features = this.analyzeFeatures(url, result);
+
+    features.forEach(feature => {
+      const li = document.createElement('li');
+      li.innerHTML = `<span class="${feature.type}">${feature.icon} ${feature.text}</span>`;
+      featureList.appendChild(li);
+    });
+  }
+
+  analyzeFeatures(url, result) {
+    const features = [];
+    const urlObj = new URL(url);
+    const hostname = urlObj.hostname.toLowerCase();
+
+    // Analyze based on your feature extractor logic
+    if (hostname.includes('bit.ly') || hostname.includes('tinyurl') || hostname.includes('goo.gl')) {
+      features.push({
+        icon: '🔗',
+        text: 'Uses URL shortener service',
+        type: 'negative'
+      });
+    }
+
+    if (/\d+\.\d+\.\d+\.\d+/.test(hostname)) {
+      features.push({
+        icon: '🌐',
+        text: 'Uses IP address instead of domain name',
+        type: 'negative'
+      });
+    }
+
+    if (hostname.endsWith('.tk') || hostname.endsWith('.ml') || hostname.endsWith('.ga') ||
+        hostname.endsWith('.cf') || hostname.endsWith('.xyz')) {
+      features.push({
+        icon: '🏷️',
+        text: 'Uses suspicious top-level domain',
+        type: 'negative'
+      });
+    }
+
+    if (hostname.includes('login') || hostname.includes('verify') || hostname.includes('secure') ||
+        hostname.includes('account') || hostname.includes('bank')) {
+      features.push({
+        icon: '🔒',
+        text: 'Contains security-related keywords in domain',
+        type: 'negative'
+      });
+    }
+
+    if (hostname.includes('google') || hostname.includes('facebook') || hostname.includes('microsoft') ||
+        hostname.includes('apple') || hostname.includes('amazon') || hostname.includes('paypal')) {
+      if (!this.isOfficialDomain(hostname)) {
+        features.push({
+          icon: '🏢',
+          text: 'Imitates well-known brand',
+          type: 'negative'
         });
-    });
+      } else {
+        features.push({
+          icon: '✅',
+          text: 'Official domain of trusted company',
+          type: 'positive'
+        });
+      }
+    }
+
+    if (url.startsWith('https://')) {
+      features.push({
+        icon: '🔐',
+        text: 'Uses HTTPS encryption',
+        type: 'positive'
+      });
+    }
+
+    if (hostname.length > 30) {
+      features.push({
+        icon: '📏',
+        text: 'Unusually long domain name',
+        type: 'negative'
+      });
+    }
+
+    if (this.calculateEntropy(hostname) > 3.5) {
+      features.push({
+        icon: '🎲',
+        text: 'Domain appears randomly generated',
+        type: 'negative'
+      });
+    }
+
+    // Add confidence-based message
+    if (result.confidence > 0.8) {
+      features.push({
+        icon: '🎯',
+        text: 'High confidence in classification',
+        type: 'positive'
+      });
+    } else if (result.confidence < 0.6) {
+      features.push({
+        icon: '⚠️',
+        text: 'Low confidence - exercise caution',
+        type: 'neutral'
+      });
+    }
+
+    return features;
+  }
+
+  isOfficialDomain(hostname) {
+    const officialDomains = [
+      'google.com', 'youtube.com', 'facebook.com', 'amazon.com', 'github.com',
+      'microsoft.com', 'apple.com', 'netflix.com', 'paypal.com', 'instagram.com'
+    ];
+    return officialDomains.some(domain => hostname.endsWith(domain));
+  }
+
+  calculateEntropy(text) {
+    const freq = {};
+    for (let char of text) {
+      freq[char] = (freq[char] || 0) + 1;
+    }
+
+    let entropy = 0;
+    for (let char in freq) {
+      const p = freq[char] / text.length;
+      entropy += -p * Math.log2(p);
+    }
+
+    return entropy;
+  }
+
+  showError(message) {
+    document.getElementById('error').textContent = message;
+    document.getElementById('error').classList.remove('hidden');
+    document.getElementById('status').className = 'status error';
+    document.getElementById('status').textContent = '❌ Error';
+  }
+}
+
+// Initialize when popup loads
+document.addEventListener('DOMContentLoaded', () => {
+  new PhishingDetectorPopup();
 });

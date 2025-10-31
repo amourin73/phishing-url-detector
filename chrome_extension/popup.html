@@ -1,75 +1,162 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8">
-    <style>
-        body {
-            width: 300px;
-            padding: 15px;
-            font-family: Arial, sans-serif;
-        }
-        .container {
-            text-align: center;
-        }
-        .url-display {
-            word-break: break-all;
-            background: #f5f5f5;
-            padding: 8px;
-            border-radius: 4px;
-            margin: 10px 0;
-            font-size: 12px;
-        }
-        .result {
-            margin: 15px 0;
-            padding: 10px;
-            border-radius: 5px;
-        }
-        .safe {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        .phishing {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        .btn {
-            background: #007bff;
-            color: white;
-            border: none;
-            padding: 8px 15px;
-            border-radius: 4px;
-            cursor: pointer;
-            margin: 5px;
-        }
-        .btn:hover {
-            background: #0056b3;
-        }
-        .hidden {
-            display: none;
-        }
-    </style>
+  <meta charset="utf-8">
+  <style>
+    body {
+      width: 400px;
+      padding: 20px;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      margin: 0;
+    }
+
+    .container {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 15px;
+      padding: 20px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    }
+
+    h1 {
+      font-size: 18px;
+      margin: 0 0 15px 0;
+      text-align: center;
+      font-weight: 600;
+    }
+
+    .url-display {
+      background: rgba(255, 255, 255, 0.2);
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      word-break: break-all;
+      font-size: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .status {
+      text-align: center;
+      padding: 15px;
+      border-radius: 10px;
+      margin: 15px 0;
+      font-weight: bold;
+      font-size: 16px;
+    }
+
+    .safe {
+      background: rgba(76, 175, 80, 0.3);
+      border: 2px solid #4CAF50;
+    }
+
+    .phishing {
+      background: rgba(244, 67, 54, 0.3);
+      border: 2px solid #F44336;
+    }
+
+    .loading {
+      background: rgba(255, 193, 7, 0.3);
+      border: 2px solid #FFC107;
+    }
+
+    .confidence {
+      text-align: center;
+      margin: 10px 0;
+      font-size: 14px;
+    }
+
+    .explanation {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 15px;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .feature-list {
+      list-style: none;
+      padding: 0;
+      margin: 10px 0;
+    }
+
+    .feature-list li {
+      padding: 5px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .feature-list li:last-child {
+      border-bottom: none;
+    }
+
+    .positive {
+      color: #4CAF50;
+    }
+
+    .negative {
+      color: #F44336;
+    }
+
+    .neutral {
+      color: #FFC107;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      margin-top: 10px;
+      transition: all 0.3s ease;
+    }
+
+    button:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: translateY(-2px);
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .error {
+      background: rgba(244, 67, 54, 0.3);
+      border: 2px solid #F44336;
+      padding: 10px;
+      border-radius: 8px;
+      text-align: center;
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <h3>🛡️ URL Guard</h3>
+  <div class="container">
+    <h1>🔍 Phishing URL Detector</h1>
 
-        <div id="current-url">
-            <strong>Current URL:</strong>
-            <div id="url-text" class="url-display">Loading...</div>
-        </div>
+    <div id="currentUrl" class="url-display">Loading current URL...</div>
 
-        <div id="result" class="result hidden">
-            <div id="status-icon"></div>
-            <h4 id="status-text"></h4>
-            <p id="confidence"></p>
-        </div>
-
-        <button id="check-btn" class="btn">Check Safety</button>
-        <div id="error" class="hidden" style="color: red; margin-top: 10px;"></div>
+    <div id="status" class="status loading">
+      Analyzing URL...
     </div>
 
-    <script src="popup.js"></script>
+    <div id="confidence" class="confidence"></div>
+
+    <div id="explanation" class="explanation hidden">
+      <h3>📊 Analysis Details:</h3>
+      <ul id="featureList" class="feature-list"></ul>
+    </div>
+
+    <div id="error" class="error hidden"></div>
+
+    <button id="refreshBtn">🔄 Reanalyze</button>
+    <button id="settingsBtn">⚙️ Settings</button>
+  </div>
+
+  <script src="popup.js"></script>
 </body>
 </html>

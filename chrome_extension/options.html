@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      width: 400px;
+      padding: 20px;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    .section {
+      margin-bottom: 20px;
+      padding: 15px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+
+    h2 {
+      color: #333;
+      margin-top: 0;
+    }
+
+    label {
+      display: block;
+      margin: 10px 0;
+    }
+
+    button {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #5a6fd8;
+    }
+  </style>
+</head>
+<body>
+  <h1>Phishing Detector Settings</h1>
+
+  <div class="section">
+    <h2>API Configuration</h2>
+    <label>
+      API Base URL:
+      <input type="text" id="apiUrl" value="http://localhost:5000" style="width: 100%; margin-top: 5px;">
+    </label>
+  </div>
+
+  <div class="section">
+    <h2>Detection Settings</h2>
+    <label>
+      <input type="checkbox" id="autoDetect" checked>
+      Automatically detect phishing sites
+    </label>
+    <label>
+      <input type="checkbox" id="showNotifications" checked>
+      Show warning notifications
+    </label>
+    <label>
+      Confidence Threshold:
+      <input type="range" id="confidenceThreshold" min="0.5" max="1.0" step="0.05" value="0.7">
+      <span id="thresholdValue">70%</span>
+    </label>
+  </div>
+
+  <div class="section">
+    <h2>About</h2>
+    <p>This extension uses machine learning to detect phishing URLs based on various features including domain characteristics, URL structure, and content analysis.</p>
+    <p><strong>Version:</strong> 1.0</p>
+  </div>
+
+  <button id="saveBtn">Save Settings</button>
+  <button id="testBtn">Test Connection</button>
+
+  <div id="status" style="margin-top: 10px;"></div>
+
+  <script src="options.js"></script>
+</body>
+</html>
